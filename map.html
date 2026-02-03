@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technoethics Mind Map - PWG Android</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; overflow: hidden; }
+        h1, h2, h3 { font-family: 'Montserrat', sans-serif; }
+        .rainbow-header { height: 6px; background: linear-gradient(90deg, #FFB7B2, #FFDAC1, #E2F0CB, #B5EAD7, #C7CEEA); }
+        #mindmap-container { width: 100%; height: calc(100vh - 80px); cursor: grab; }
+        #mindmap-container:active { cursor: grabbing; }
+        .node-circle { stroke: #fff; stroke-width: 2px; }
+        .node-label { font-family: 'Montserrat', sans-serif; font-weight: 600; pointer-events: none; text-anchor: middle; }
+        .link { stroke: #e2e8f0; stroke-opacity: 0.6; }
+        .sidebar { position: fixed; top: 100px; right: 24px; width: 320px; max-height: calc(100vh - 140px); background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 50; }
+        .stats-panel { position: fixed; bottom: 24px; left: 24px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; z-index: 50; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        #loading-overlay { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.5s ease; }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="text-4xl font-bold mb-4 animate-pulse" style="font-family: Montserrat;">Mapping Team Values...</div>
+        <div class="w-48 h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-indigo-500 animate-[loading_2s_infinite]"></div>
+        </div>
+    </div>
+
+    <nav class="bg-white border-b border-gray-200 relative z-50">
+        <div class="rainbow-header"></div>
+        <div class="px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold text-gray-900">Value Mind Map</h1>
+                <span id="response-count" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">0 Responses</span>
+            </div>
+            <div class="text-sm text-gray-500 font-medium">PWG-Android Summit</div>
+        </div>
+    </nav>
+
+    <div id="mindmap-container"></div>
+
+    <div class="sidebar overflow-hidden">
+        <div class="p-4 border-b border-gray-100 bg-gray-50">
+            <h3 class="font-bold text-sm uppercase tracking-wider text-gray-500">Recent Submissions</h3>
+        </div>
+        <div id="submissions-list" class="overflow-y-auto flex-grow p-4 space-y-4">
+            <div class="text-center text-gray-400 py-8 italic">Waiting for data...</div>
+        </div>
+    </div>
+
+    <div class="stats-panel max-w-xs">
+        <h3 class="font-bold text-sm mb-3 text-gray-700">Categories</h3>
+        <div id="legend-list" class="space-y-1 text-xs"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /** * FIREBASE CONFIGURATION
+         * Ensure this config matches the one used in the selection form index.html
+         */
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "", 
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'technoethics-summit-2026';
+
+        const categoryColors = {
+            "Self-Direction": "#FFB7B2", "Stimulation": "#FFDAC1", "Hedonism": "#FFF9C4",
+            "Achievement": "#E2F0CB", "Power": "#B5EAD7", "Security": "#C7CEEA",
+            "Conformity": "#F3E5F5", "Tradition": "#E8EAF6", "Benevolence": "#E1F5FE",
+            "Universalism": "#E0F2F1"
+        };
+
+        let user = null;
+        let simulation = null;
+        let svg = null;
+        let g = null;
+
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+
+        initAuth();
+        onAuthStateChanged(auth, (u) => { user = u; if (user) startListening(); });
+
+        function startListening() {
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
+            onSnapshot(q, (snapshot) => {
+                const responses = [];
+                snapshot.forEach(doc => responses.push(doc.data()));
+                updateVisuals(responses);
+                const loader = document.getElementById('loading-overlay');
+                if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
+            }, (err) => console.error("Firestore error:", err));
+        }
+
+        function updateVisuals(data) {
+            document.getElementById('response-count').innerText = `${data.length} Responses`;
+            const list = document.getElementById('submissions-list');
+            list.innerHTML = data.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0))
+                .map(resp => `
+                    <div class="border-b border-gray-50 pb-3">
+                        <div class="font-bold text-sm text-gray-800">${resp.name}</div>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            ${resp.values.map(v => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">${v.value}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('') || '<div class="text-center text-gray-400 py-8 italic">No submissions yet</div>';
+
+            const legend = document.getElementById('legend-list');
+            legend.innerHTML = Object.entries(categoryColors).map(([cat, col]) => `<div class="flex items-center"><span class="legend-dot" style="background: ${col}"></span><span class="text-gray-600">${cat}</span></div>`).join('');
+
+            const valueCounts = {};
+            const catMap = {};
+            data.forEach(resp => {
+                resp.values.forEach(v => {
+                    valueCounts[v.value] = (valueCounts[v.value] || 0) + 1;
+                    catMap[v.value] = v.category;
+                });
+            });
+
+            const nodes = [{ id: "PWG Android", type: "root", r: 35 }];
+            const links = [];
+            Object.keys(categoryColors).forEach(cat => {
+                nodes.push({ id: cat, type: "category", category: cat, r: 22 });
+                links.push({ source: "PWG Android", target: cat });
+            });
+            Object.entries(valueCounts).forEach(([val, count]) => {
+                const cat = catMap[val];
+                nodes.push({ id: val, type: "value", category: cat, r: 8 + (count * 4) });
+                links.push({ source: cat, target: val });
+            });
+            renderGraph(nodes, links);
+        }
+
+        function renderGraph(nodes, links) {
+            const container = document.getElementById('mindmap-container');
+            if (!svg) {
+                svg = d3.select("#mindmap-container").append("svg").attr("width", "100%").attr("height", "100%")
+                    .call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
+                g = svg.append("g");
+            }
+            g.selectAll("*").remove();
+            simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.source.type === 'root' ? 140 : 50))
+                .force("charge", d3.forceManyBody().strength(-250))
+                .force("center", d3.forceCenter(container.clientWidth / 2, container.clientHeight / 2))
+                .force("collision", d3.forceCollide().radius(d => d.r + 5));
+
+            const linkElements = g.append("g").selectAll("line").data(links).enter().append("line").attr("class", "link");
+            const nodeElements = g.append("g").selectAll("g").data(nodes).enter().append("g")
+                .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+
+            nodeElements.append("circle").attr("r", d => d.r)
+                .attr("fill", d => d.type === 'root' ? '#202124' : categoryColors[d.category] || '#fff')
+                .attr("class", "node-circle");
+
+            nodeElements.append("text").attr("dy", d => d.r + 12).attr("class", "node-label")
+                .attr("font-size", d => d.type === 'root' ? '14px' : '9px').text(d => d.id);
+
+            simulation.on("tick", () => {
+                linkElements.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+                nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        }
+        function dragstarted(e, d) { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+        function dragged(e, d) { d.fx = e.x; d.fy = e.y; }
+        function dragended(e, d) { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+    </script>
+</body>
+</html>
