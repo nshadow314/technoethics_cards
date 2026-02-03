@@ -170,13 +170,11 @@
             const submitBtn = document.getElementById('submit-btn');
 
             // Update Rank Badges
-            // First clear all badges
             document.querySelectorAll('.rank-badge').forEach(badge => {
                 badge.classList.remove('rank-active');
                 badge.innerText = '';
             });
 
-            // Set badges based on current selectedValues order
             selectedValues.forEach((item, index) => {
                 const safeVal = item.value.replace(/\s+/g, '-').toLowerCase();
                 const badge = document.getElementById(`rank-${safeVal}`);
@@ -214,7 +212,7 @@
         async function submitValues() {
             const name = document.getElementById('user-name').value.trim();
             if (!name) { alert("Please enter your name."); return; }
-            if (WEB_APP_URL.includes("https://script.google.com/a/macros/google.com/s/AKfycbyxKQakVmGPyytxaOlJeYkrlO1oQg3xauzm8dDMnkfhcsIiIG9D-FZBMucqVirP1g1Q4g/exec")) {
+            if (WEB_APP_URL.includes("PASTE_YOUR_SCRIPT_URL_HERE")) {
                 alert("Please add your Web App URL to the code before submitting.");
                 return;
             }
@@ -223,15 +221,16 @@
             submitBtn.innerText = "Submitting...";
             submitBtn.disabled = true;
 
-            // payload matches the backend expectation
             const payload = { name: name, values: selectedValues };
 
             try {
+                // Using 'text/plain' content type is the secret to getting 'no-cors' to work 
+                // reliably with Google Apps Script from an external domain.
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain' }, 
                     body: JSON.stringify(payload)
                 });
 
@@ -241,7 +240,7 @@
                 window.scrollTo(0,0);
             } catch (error) {
                 console.error("Submission error:", error);
-                alert("There was an error submitting your values. Please try again.");
+                alert("There was an error submitting. Check the developer console.");
                 submitBtn.innerText = "Submit";
                 submitBtn.disabled = false;
             }
