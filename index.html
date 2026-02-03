@@ -11,9 +11,29 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
         h1, h2, h3 { font-family: 'Montserrat', sans-serif; }
-        .rainbow-header { height: 12px; background: linear-gradient(90deg, #FFB7B2, #FFDAC1, #E2F0CB, #B5EAD7, #C7CEEA); border-top-left-radius: 8px; border-top-right-radius: 8px; }
+        .rainbow-header { 
+            height: 12px; 
+            background: linear-gradient(90deg, #FFB7B2, #FFDAC1, #E2F0CB, #B5EAD7, #C7CEEA); 
+            border-top-left-radius: 8px; 
+            border-top-right-radius: 8px; 
+        }
         .card { background: white; border-radius: 8px; border: 1px solid #dadce0; margin-bottom: 12px; padding: 24px; }
-        .selected-counter { position: fixed; bottom: 24px; right: 24px; background: #202124; color: white; padding: 12px 24px; border-radius: 50px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 100; display: flex; align-items: center; gap: 12px; font-weight: 500; transition: background-color 0.3s; }
+        .selected-counter { 
+            position: fixed; 
+            bottom: 24px; 
+            right: 24px; 
+            background: #202124; 
+            color: white; 
+            padding: 12px 24px; 
+            border-radius: 50px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+            z-index: 100; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-weight: 500; 
+            transition: background-color 0.3s; 
+        }
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: #673ab7; cursor: pointer; }
         .value-label { cursor: pointer; transition: color 0.2s; }
         .value-label:hover { color: #673ab7; }
@@ -29,17 +49,19 @@
         <div class="card p-0 overflow-hidden mb-4">
             <div class="rainbow-header"></div>
             <div class="p-8">
-                <h1 class="text-3xl font-bold mb-4">Basic Human Values</h1>
-                <p class="text-gray-600 mb-6">Welcome to the PWG Technoethics session. Please enter your name and select exactly <strong>6 values</strong> that matter most to you.</p>
+                <h1 class="text-3xl font-bold mb-4">Schwartz Basic Human Values</h1>
+                <p class="text-gray-600 mb-6">Welcome to the PWG Technoethics session. Please select exactly <strong>6 values</strong> that matter most to you in the context of your life and work.</p>
                 <div class="text-sm text-red-600 font-medium">* Required</div>
             </div>
         </div>
 
+        <!-- User Identity -->
         <div class="card">
             <label class="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
             <input type="text" id="user-name" placeholder="Your answer" class="input-field">
         </div>
 
+        <!-- Container for dynamically generated values -->
         <div id="form-content"></div>
 
         <div class="flex justify-between items-center mt-8 mb-20">
@@ -48,53 +70,24 @@
         </div>
     </div>
 
+    <!-- Confirmation Screen -->
     <div id="success-screen" class="max-w-2xl mx-auto success-state">
         <div class="card p-12">
-            <div class="text-6xl mb-6 text-green-500"><i class="fa-solid fa-circle-check"></i></div>
-            <h2 class="text-3xl font-bold mb-4">Response Recorded</h2>
-            <p class="text-gray-600 mb-8">Your values have been added to the team mind map.</p>
+            <h2 class="text-3xl font-bold mb-4 text-green-600">Response Recorded!</h2>
+            <p class="text-gray-600 mb-8">Thank you. Your values have been saved to the team spreadsheet.</p>
             <button onclick="location.reload()" class="text-[#673ab7] font-medium hover:underline">Submit another response</button>
         </div>
     </div>
 
+    <!-- Floating Selection Counter -->
     <div id="counter" class="selected-counter hidden">
         <span id="counter-text">0 / 6 Selected</span>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        /** * FIREBASE CONFIGURATION
-         * When hosting on GitHub, replace the config below with your actual project config
+    <script>
+        /** * 1. Paste your Google Apps Script "Web App URL" below.
          */
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "", // Paste your API Key here
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: ""
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'technoethics-summit-2026';
-
-        let user = null;
-
-        const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
-
-        initAuth();
-        onAuthStateChanged(auth, (u) => { user = u; });
+        const WEB_APP_URL = "PASTE_YOUR_SCRIPT_URL_HERE";
 
         const schwartzValues = [
             { category: "Self-Direction", color: "#FFB7B2", description: "Independent thought and action.", items: ["Creativity", "Curious", "Freedom", "Choice of own goals", "Independence", "Privacy"] },
@@ -111,7 +104,7 @@
 
         let selectedValues = [];
 
-        window.renderForm = function() {
+        function renderForm() {
             const container = document.getElementById('form-content');
             container.innerHTML = schwartzValues.map((cat) => `
                 <div class="card border-l-8" style="border-left-color: ${cat.color}">
@@ -123,7 +116,7 @@
                             const id = `val-${val.replace(/\s+/g, '-').toLowerCase()}`;
                             return `
                                 <div class="flex items-center gap-4">
-                                    <input type="checkbox" id="${id}" data-value="${val}" data-category="${cat.category}" onchange="toggleValue(this)">
+                                    <input type="checkbox" id="${id}" data-value="${val}" onchange="toggleValue(this)">
                                     <label for="${id}" class="value-label text-lg">${val}</label>
                                 </div>
                             `;
@@ -131,33 +124,34 @@
                     </div>
                 </div>
             `).join('');
-        };
+        }
 
-        window.toggleValue = function(checkbox) {
+        function toggleValue(checkbox) {
             const val = checkbox.dataset.value;
-            const cat = checkbox.dataset.category;
             if (checkbox.checked) {
                 if (selectedValues.length >= 6) {
                     checkbox.checked = false;
                     return;
                 }
-                selectedValues.push({ value: val, category: cat });
+                selectedValues.push({ value: val });
             } else {
                 selectedValues = selectedValues.filter(item => item.value !== val);
             }
             updateUI();
-        };
+        }
 
-        window.updateUI = function() {
+        function updateUI() {
             const counter = document.getElementById('counter');
             const counterText = document.getElementById('counter-text');
             const submitBtn = document.getElementById('submit-btn');
+
             if (selectedValues.length > 0) {
                 counter.classList.remove('hidden');
                 counterText.innerText = `${selectedValues.length} / 6 Selected`;
             } else {
                 counter.classList.add('hidden');
             }
+
             if (selectedValues.length === 6) {
                 counter.style.backgroundColor = '#10b981';
                 submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -167,46 +161,52 @@
                 submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 submitBtn.disabled = true;
             }
-        };
+        }
 
-        window.resetForm = function() {
+        function resetForm() {
             selectedValues = [];
             document.getElementById('user-name').value = '';
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
             updateUI();
-        };
+        }
 
-        window.submitValues = async function() {
+        async function submitValues() {
             const name = document.getElementById('user-name').value.trim();
             if (!name) { alert("Please enter your name."); return; }
-            if (selectedValues.length !== 6) { alert("Please select exactly 6 values."); return; }
-            if (!user) { alert("Authenticating..."); return; }
+            if (WEB_APP_URL.includes("PASTE_YOUR_SCRIPT_URL_HERE")) {
+                alert("Please add your Web App URL to the code before submitting.");
+                return;
+            }
 
             const submitBtn = document.getElementById('submit-btn');
             submitBtn.innerText = "Submitting...";
             submitBtn.disabled = true;
 
+            const payload = { name: name, values: selectedValues };
+
             try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'responses'), {
-                    name: name,
-                    values: selectedValues,
-                    submittedAt: serverTimestamp(),
-                    userId: user.uid
+                // 'no-cors' allows us to send the POST without getting blocked by browser security
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
+
                 document.getElementById('form-container').style.display = 'none';
                 document.getElementById('counter').style.display = 'none';
                 document.getElementById('success-screen').style.display = 'block';
-                window.scrollTo(0, 0);
+                window.scrollTo(0,0);
             } catch (error) {
-                console.error("Error submitting:", error);
+                console.error("Submission error:", error);
+                alert("There was an error submitting your values. Please try again.");
                 submitBtn.innerText = "Submit";
                 submitBtn.disabled = false;
-                alert("Error saving data. Please check your connection.");
             }
-        };
+        }
 
         renderForm();
     </script>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </body>
 </html>
